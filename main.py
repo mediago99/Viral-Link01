@@ -1,14 +1,13 @@
 import os
 import json
 import threading
-import asyncio  # এটি নিশ্চিত করুন আছে কি না
+import asyncio
 from flask import Flask
 import firebase_admin
 from firebase_admin import credentials, db
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.constants import ParseMode  # নতুন নিয়ম অনুযায়ী ইমপোর্ট
+from telegram.constants import ParseMode  # সঠিক ইমপোর্ট
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
-
 
 # ---------------- WEB SERVER ----------------
 app = Flask(__name__)
@@ -18,12 +17,14 @@ def home():
     return "Bot is Running Perfectly!"
 
 def run_flask():
+    # Render ডিফল্ট পোর্ট ১০০০০ ব্যবহার করে
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
 
 # ---------------- CONFIG ----------------
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
-ADMIN_ID = int(os.environ.get("ADMIN_ID", "0"))
+# স্ক্রিনশট অনুযায়ী আপনার আইডি: 6311806060
+ADMIN_ID = int(os.environ.get("ADMIN_ID", "6311806060")) 
 CHANNEL_USERNAME = "@viralmoviehubbd"
 APP_URL = os.environ.get("APP_URL")
 FIREBASE_DB_URL = "https://viralmoviehubbd-default-rtdb.firebaseio.com/"
@@ -57,7 +58,6 @@ def progress_bar(count, total=5):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
     
-    # ইউজার Firebase এ থাকছে কি না চেক
     if not user_ref.child(user_id).get():
         ref_by = context.args[0] if context.args else None
         user_ref.child(user_id).set({"referrals": 0, "coins": 0, "ref_by": ref_by})
@@ -68,7 +68,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "coins": r.get("coins", 0) + 100
             })
     
-    # চ্যানেল সাবস্ক্রিপশন চেক
     is_joined = await is_subscribed(context.bot, user_id)
     if not is_joined:
         kb = [
@@ -114,7 +113,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id != ADMIN_ID:
-        await update.message.reply_text("❌ You are not authorized to post.")
+        await update.message.reply_text(f"❌ You are not authorized. Your ID: {user_id}")
         return
     
     if not context.args:
@@ -122,12 +121,16 @@ async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     try:
+        # মুভি ডেটা প্রসেসিং
         data = " ".join(context.args).split("|")
+        if len(data) < 3:
+            raise ValueError("সবগুলো তথ্য (নাম, ইমেজ, লিংক) সঠিকভাবে দিন।")
+            
         movie_name = data[0].strip()
         image_url = data[1].strip()
         movie_link = data[2].strip()
         
-        # চ্যানেলে পোস্ট
+        # চ্যানেলে পোস্ট পাঠানো
         kb = [[InlineKeyboardButton("🎬 Watch Movie", url=movie_link)]]
         await context.bot.send_photo(
             chat_id=CHANNEL_USERNAME,
@@ -136,47 +139,24 @@ async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=InlineKeyboardMarkup(kb)
         )
         
-        await update.message.reply_text("✅ Posted Successfully!")
+        await update.message.reply_text("✅ চ্যানেলে সফলভাবে পোস্ট করা হয়েছে!")
     except Exception as e:
-        await update.message.reply_text(f"❌ Error: {e}")
+        await update.message.reply_text(f"❌ Error: {str(e)}")
 
-# ---------------- MAIN ----------------
-async def main():
-    # Flask সার্ভারটি আলাদা থ্রেডে চালু হবে
+# ---------------- RUN ----------------
+if __name__ == "__main__":
+    # ১. Flask সার্ভার আলাদা থ্রেডে চালু করা
     threading.Thread(target=run_flask, daemon=True).start()
     
-    # বট অ্যাপ্লিকেশন সেটআপ
+    # ২. টেলিগ্রাম অ্যাপ্লিকেশন তৈরি
     application = ApplicationBuilder().token(BOT_TOKEN).build()
     
-    # হ্যান্ডলারগুলো যোগ করা
+    # ৩. হ্যান্ডলার যুক্ত করা
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(button_handler))
     application.add_handler(CommandHandler("post", post))
     
-    print("Bot is starting...")
+    print("Bot is starting via run_polling...")
     
-    # run_polling সরাসরি ব্যবহার করা সবচেয়ে নিরাপদ
-    # এটি নিজে থেকেই asyncio loop এবং সিগন্যাল হ্যান্ডেল করে
-    await application.initialize()
-    await application.start()
-    await application.updater.start_polling(drop_pending_updates=True)
-    
-    # বট সচল রাখার জন্য
-    while True:
-        await asyncio.sleep(3600)
-
-# ---------------- RUN ----------------
-if __name__ == "__main__":
-    import asyncio
-    try:
-        asyncio.run(main())
-    except (KeyboardInterrupt, SystemExit):
-        pass
-    except RuntimeError as e:
-        if "already running" in str(e):
-            loop = asyncio.get_event_loop()
-            loop.create_task(main())
-        else:
-            raise e
-
-        
+    # ৪. run_polling ব্যবহার করা সবচেয়ে নিরাপদ উপায় (এটি নিজে থেকেই ইভেন্ট লুপ হ্যান্ডেল করে)
+    application.run_polling(drop_pending_updates=True)
