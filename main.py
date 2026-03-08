@@ -5,7 +5,13 @@ import asyncio
 from flask import Flask
 import firebase_admin
 from firebase_admin import credentials, db
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, WebAppInfo
+from telegram import (
+    InlineKeyboardButton, 
+    InlineKeyboardMarkup, 
+    Update, 
+    WebAppInfo, 
+    MenuButtonWebApp  # এটি এরর সমাধানের জন্য যুক্ত করা হয়েছে
+)
 from telegram.constants import ParseMode 
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 
@@ -119,39 +125,50 @@ async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"❌ ভুল হয়েছে: /post নাম | ইমেজ URL | মুভি লিঙ্ক")
 
-# --- অ্যাডমিন রিপোর্ট কমান্ড ---
 async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID: return
-    
     all_users = user_ref.get()
     all_movies = movie_ref.get()
-    
     user_count = len(all_users) if all_users else 0
     movie_count = len(all_movies) if all_movies else 0
-    
     text = (f"📊 **বট রিপোর্ট (অ্যাডমিন)**\n\n"
             f"👤 মোট ইউজার: {user_count} জন\n"
             f"🎬 মোট মুভি: {movie_count} টি")
     await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
 
-# --- মেনু বাটন ফিক্স (গিটহাব পেজ লিঙ্ক) ---
+# --- এরর সমাধান করা মেনু বাটন ফাংশন ---
 async def post_init(application):
+    # আপনার গিটহাব পেজ লিঙ্ক
     MOVIE_APP_FRONTEND = "https://mediago99.github.io/Viral-Link01/" 
-    await application.bot.set_chat_menu_button(
-        menu_button=WebAppInfo(url=MOVIE_APP_FRONTEND)
-    )
+    
+    # এখানে MenuButtonWebApp ব্যবহার করা হয়েছে যা 'type' ফিল্ড এরর সমাধান করবে
+    try:
+        await application.bot.set_chat_menu_button(
+            menu_button=MenuButtonWebApp(
+                text="ভিডিও দেখুন", 
+                web_app=WebAppInfo(url=MOVIE_APP_FRONTEND)
+            )
+        )
+        print("Menu Button Configured Successfully!")
+    except Exception as e:
+        print(f"Failed to set Menu Button: {e}")
 
+# ---------------- RUN BOT ----------------
 if __name__ == "__main__":
     threading.Thread(target=run_flask, daemon=True).start()
+    
+    # application তৈরি করার সময় post_init এর মাধ্যমে মেনু বাটন সেট করা হবে
     application = ApplicationBuilder().token(BOT_TOKEN).post_init(post_init).build()
     
-    # হ্যান্ডলার অ্যাড করা
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("status", status))
     application.add_handler(CommandHandler("post", post))
-    application.add_handler(CommandHandler("users", admin_stats)) # ইউজার চেক করার কমান্ড
+    application.add_handler(CommandHandler("users", admin_stats))
     application.add_handler(CallbackQueryHandler(button_handler))
+    
+    print("Bot is starting...")
     
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     application.run_polling(drop_pending_updates=True)
+    
