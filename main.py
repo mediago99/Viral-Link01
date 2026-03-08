@@ -115,44 +115,33 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID: return
     
-    # ইউজার কী লিখেছে তা চেক করা
     full_text = " ".join(context.args)
+    data = [i.strip() for i in full_text.split("|")]
     
-    if not full_text or "|" not in full_text:
+    if len(data) < 3:
         await update.message.reply_text("❌ ফরম্যাট: /post নাম | ইমেজ URL | মুভি লিঙ্ক")
         return
 
-    try:
-        # এখানে split করার পর দুই পাশের বাড়তি স্পেস মুছে ফেলা হবে (strip)
-        data = [i.strip() for i in full_text.split("|")]
-        
-        if len(data) < 3:
-            await update.message.reply_text("❌ মুভির নাম, ইমেজ এবং লিঙ্ক—এই তিনটি তথ্যই দিতে হবে।")
-            return
-            
-        movie_name, image_url, movie_link = data[0], data[1], data[2]
-        
-        # ডাটাবেজে সেভ করা
-        movie_ref.push({
-            "title": movie_name, 
-            "image_url": image_url, 
-            "video_url": movie_link
-        })
-        
-        # চ্যানেলে পোস্ট করা
-        kb = [[InlineKeyboardButton("🎬 Watch Movie (Open App)", web_app=WebAppInfo(url=MOVIE_APP_URL))]]
-        await context.bot.send_photo(
-            chat_id=CHANNEL_USERNAME, 
-            photo=image_url, 
-            caption=f"🎬 **{movie_name}**\n\nনিচের বাটন থেকে মুভিটি দেখুন।", 
-            reply_markup=InlineKeyboardMarkup(kb), 
-            parse_mode=ParseMode.MARKDOWN
-        )
-        await update.message.reply_text("✅ মুভিটি সফলভাবে চ্যানেলে পোস্ট হয়েছে!")
-        
-    except Exception as e:
-        await update.message.reply_text(f"❌ এরর: {str(e)}")
-
+    movie_name, image_url, movie_link = data[0], data[1], data[2]
+    
+    # এটি মিনি অ্যাপে (লকসহ) মুভি যোগ করবে
+    movie_ref.push({"title": movie_name, "image_url": image_url, "video_url": movie_link})
+    
+    # চ্যানেলের জন্য বাটন তৈরি (ইউজারকে বটের ভেতর পাঠাবে)
+    bot_me = await context.bot.get_me()
+    bot_url = f"https://t.me/{bot_me.username}"
+    
+    # চ্যানেলে 'url' বাটন দিতে হবে, 'web_app' বাটন নয়
+    kb = [[InlineKeyboardButton("🎬 Watch Movie", url=bot_url)]]
+    
+    await context.bot.send_photo(
+        chat_id=CHANNEL_USERNAME, 
+        photo=image_url, 
+        caption=f"🎬 **{movie_name}**\n\nমুভিটি দেখতে নিচের বাটনে ক্লিক করুন।", 
+        reply_markup=InlineKeyboardMarkup(kb), 
+        parse_mode=ParseMode.MARKDOWN
+    )
+    await update.message.reply_text("✅ চ্যানেলে পোস্ট সফল হয়েছে এবং মিনি অ্যাপে যোগ হয়েছে!")
 
 async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID: return
