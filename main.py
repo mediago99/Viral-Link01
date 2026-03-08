@@ -163,7 +163,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "✅ App Unlock হয়েছে!",
                 reply_markup=InlineKeyboardMarkup(kb)
             )
-
 # ---------------- MAIN ----------------
 async def main():
     # Flask আলাদা thread এ চালানো
@@ -177,12 +176,12 @@ async def main():
     print("Bot Started Successfully!")
 
     # Polling চালানো
-    application.run_polling()
+    await application.run_polling()
 
 # ---------------- RUN ----------------
 if __name__ == "__main__":
-    # asyncio.run(main()) ব্যবহার করা হবে না
+    # Python 3.14 safe event loop
     import asyncio
-    loop = asyncio.get_event_loop()
-    loop.create_task(main())
-    loop.run_forever()
+    loop = asyncio.new_event_loop()       # নতুন লুপ তৈরি
+    asyncio.set_event_loop(loop)          # সেটাকে current loop হিসেবে সেট করা
+    loop.run_until_complete(main())       # main চালানো
