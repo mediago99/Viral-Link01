@@ -166,18 +166,23 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ---------------- MAIN ----------------
 async def main():
+    # Flask আলাদা thread এ চালানো
+    threading.Thread(target=run_flask, daemon=True).start()
 
-    threading.Thread(target=run_flask).start()
-
+    # Telegram Bot তৈরি
     application = ApplicationBuilder().token(BOT_TOKEN).build()
-
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(button_handler))
 
     print("Bot Started Successfully!")
 
-    await application.run_polling()
+    # Polling চালানো
+    application.run_polling()
 
 # ---------------- RUN ----------------
 if __name__ == "__main__":
-    asyncio.run(main())
+    # asyncio.run(main()) ব্যবহার করা হবে না
+    import asyncio
+    loop = asyncio.get_event_loop()
+    loop.create_task(main())
+    loop.run_forever()
