@@ -5,120 +5,92 @@ import asyncio
 from flask import Flask
 import firebase_admin
 from firebase_admin import credentials, db
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, WebAppInfo
 from telegram.constants import ParseMode 
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 
-# ---------------- WEB SERVER ----------------
+# ---------------- WEB SERVER (For Render) ----------------
 app = Flask(__name__)
-
 @app.route('/')
-def home():
-    return "Bot is Running Perfectly!"
+def home(): return "Bot is Running Perfectly!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
 
-# ---------------- CONFIG ----------------
+# ---------------- CONFIGURATION ----------------
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
-ADMIN_ID = int(os.environ.get("ADMIN_ID", "6311806060")) 
-CHANNEL_USERNAME = "@viralmoviehubbd"
-APP_URL = os.environ.get("APP_URL")
+ADMIN_ID = 6311806060 # আপনার আইডি
+CHANNEL_USERNAME = "@viralmoviehubbd" # আপনার চ্যানেল
+APP_URL = os.environ.get("APP_URL") # আপনার মিনি অ্যাপের লিঙ্ক
 FIREBASE_DB_URL = "https://viralmoviehubbd-default-rtdb.firebaseio.com/"
 FIREBASE_CREDS = os.environ.get("FIREBASE_CREDENTIALS")
 
-# ---------------- FIREBASE ----------------
+# ---------------- FIREBASE SETUP ----------------
 if not firebase_admin._apps:
     try:
         cred_dict = json.loads(FIREBASE_CREDS)
         cred = credentials.Certificate(cred_dict)
         firebase_admin.initialize_app(cred, {'databaseURL': FIREBASE_DB_URL})
-    except Exception as e:
-        print(f"Firebase Init Error: {e}")
+    except Exception as e: print(f"Firebase Error: {e}")
 
 user_ref = db.reference('users')
+movie_ref = db.reference('movies')
 
 # ---------------- HELPERS ----------------
 async def is_subscribed(bot, user_id):
     try:
         member = await bot.get_chat_member(CHANNEL_USERNAME, user_id)
         return member.status in ['member', 'administrator', 'creator']
-    except:
-        return False
-
-def progress_bar(count, total=5):
-    filled = "█" * min(count, total)
-    empty = "░" * max(0, total - count)
-    return f"[{filled}{empty}] {int((min(count, total)/total)*100)}%"
+    except: return False
 
 # ---------------- HANDLERS ----------------
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
+    # ইউজার ডাটাবেজ চেক
     if not user_ref.child(user_id).get():
-        ref_by = context.args[0] if context.args else None
-        user_ref.child(user_id).set({"referrals": 0, "coins": 0, "ref_by": ref_by})
-        if ref_by and ref_by != user_id:
-            r = user_ref.child(ref_by).get() or {"referrals": 0, "coins": 0}
-            user_ref.child(ref_by).update({"referrals": r.get("referrals", 0) + 1, "coins": r.get("coins", 0) + 100})
+        user_ref.child(user_id).set({"referrals": 0, "coins": 0})
     
-    is_joined = await is_subscribed(context.bot, user_id)
-    if not is_joined:
-        kb = [[InlineKeyboardButton("📢 Join Channel", url=f"https://t.me/{CHANNEL_USERNAME[1:]}")], [InlineKeyboardButton("✅ Joined", callback_data="check_join")]]
+    # জয়েন চেক
+    if not await is_subscribed(context.bot, user_id):
+        kb = [[InlineKeyboardButton("📢 Join Channel", url=f"https://t.me/{CHANNEL_USERNAME[1:]}")],
+              [InlineKeyboardButton("✅ Joined", callback_data="check_join")]]
         await update.message.reply_text("❌ আগে চ্যানেলে জয়েন করুন", reply_markup=InlineKeyboardMarkup(kb))
     else:
-        kb = [[InlineKeyboardButton("🎬 Open Movie App", callback_data="open_app")]]
+        # মিনি অ্যাপ বাটন
+        kb = [[InlineKeyboardButton("🎬 Open Movie App", web_app=WebAppInfo(url=APP_URL))]]
         await update.message.reply_text("🎬 Viral Movie Hub এ স্বাগতম", reply_markup=InlineKeyboardMarkup(kb))
 
-async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    user_id = str(update.effective_user.id)
-    if query.data == "check_join":
-        if await is_subscribed(context.bot, user_id):
-            await query.edit_message_text("✅ ধন্যবাদ!", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🎬 Open App", callback_data="open_app")]]))
-        else:
-            await query.answer("❌ এখনো জয়েন করেননি!", show_alert=True)
-    elif query.data == "open_app":
-        user = user_ref.child(user_id).get() or {}
-        refs = user.get("referrals", 0)
-        if refs < 5:
-            bot_me = await context.bot.get_me()
-            await query.edit_message_text(f"🔒 ৫ রেফারেল লাগবে।\n{progress_bar(refs)}\nলিংক: `https://t.me/{bot_me.username}?start={user_id}`", parse_mode=ParseMode.MARKDOWN)
-        else:
-            await query.edit_message_text("✅ আনলকড!", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🎬 Open WebApp", web_app={"url": APP_URL})]]))
-
-# ---------------- POST COMMAND ----------------
+# অ্যাডমিন পোস্ট সিস্টেম
 async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != ADMIN_ID:
-        return
+    if update.effective_user.id != ADMIN_ID: return
     try:
         data = " ".join(context.args).split("|")
         movie_name, image_url, movie_link = [i.strip() for i in data]
-        kb = [[InlineKeyboardButton("🎬 Watch Movie", url=movie_link)]]
-        await context.bot.send_photo(chat_id=CHANNEL_USERNAME, photo=image_url, caption=f"🎬 {movie_name}", reply_markup=InlineKeyboardMarkup(kb))
-        await update.message.reply_text("✅ সফলভাবে পোস্ট হয়েছে!")
+        
+        # ১. ডাটাবেজে মুভি সেভ করা (যাতে অ্যাপে শো করে)
+        new_movie = movie_ref.push({
+            "title": movie_name,
+            "image_url": image_url,
+            "video_url": movie_link
+        })
+        
+        # ২. চ্যানেলে পোস্ট পাঠানো (বাটনটি মিনি অ্যাপ ওপেন করবে)
+        kb = [[InlineKeyboardButton("🎬 Watch Movie (Open App)", web_app=WebAppInfo(url=APP_URL))]]
+        await context.bot.send_photo(chat_id=CHANNEL_USERNAME, photo=image_url, 
+                                     caption=f"🎬 {movie_name}\n\nনিচের বাটনে ক্লিক করে মুভিটি আনলক করুন।", 
+                                     reply_markup=InlineKeyboardMarkup(kb))
+        await update.message.reply_text("✅ মুভিটি অ্যাপ এবং চ্যানেলে পোস্ট হয়েছে!")
     except:
-        await update.message.reply_text("❌ ফরম্যাট: /post নাম | ইমেজ URL | লিংক")
+        await update.message.reply_text("❌ ফরম্যাট: /post নাম | ইমেজ URL | মুভি লিঙ্ক")
 
-# ---------------- RUN ----------------
+# ---------------- RUN BOT ----------------
 if __name__ == "__main__":
-    # Flask থ্রেড চালু
     threading.Thread(target=run_flask, daemon=True).start()
-    
-    # অ্যাপ্লিকেশন এবং লুপ কনফিগারেশন
     application = ApplicationBuilder().token(BOT_TOKEN).build()
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CallbackQueryHandler(button_handler))
     application.add_handler(CommandHandler("post", post))
     
-    print("Bot is starting...")
-    
-    try:
-        # Python 3.14 এর জন্য ইভেন্ট লুপ ফিক্স
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        application.run_polling(drop_pending_updates=True)
-    except Exception as e:
-        print(f"Error: {e}")
-        
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    application.run_polling(drop_pending_updates=True)
