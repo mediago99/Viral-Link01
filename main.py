@@ -165,7 +165,7 @@ async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def post_init(application):
     # আপনার মুভি অ্যাপের ফ্রন্টএন্ড লিঙ্ক (GitHub Pages লিঙ্ক) এখানে দিন
     # রেন্ডার লিঙ্ক নয়, যেখানে index.html আছে সেই লিঙ্কটি হবে।
-    MOVIE_APP_FRONTEND = "https://your-github-username.github.io/your-repo/" 
+    MOVIE_APP_FRONTEND = "https://mediago99.github.io/Viral-Link01" 
     
     await application.bot.set_chat_menu_button(
         menu_button=WebAppInfo(url=MOVIE_APP_FRONTEND)
