@@ -160,15 +160,23 @@ async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"❌ ভুল হয়েছে! সঠিকভাবে লিখুন:\n/post নাম | ইমেজ URL | মুভি লিঙ্ক\nError: {str(e)}")
 
-# ---------------- RUN BOT ----------------
+# main.py এর নিচে এই অংশটুকু যোগ করুন
+
+async def post_init(application):
+    # আপনার মুভি অ্যাপের ফ্রন্টএন্ড লিঙ্ক (GitHub Pages লিঙ্ক) এখানে দিন
+    # রেন্ডার লিঙ্ক নয়, যেখানে index.html আছে সেই লিঙ্কটি হবে।
+    MOVIE_APP_FRONTEND = "https://your-github-username.github.io/your-repo/" 
+    
+    await application.bot.set_chat_menu_button(
+        menu_button=WebAppInfo(url=MOVIE_APP_FRONTEND)
+    )
+
 if __name__ == "__main__":
-    # Flask সার্ভার চালু করা (Render হোস্টিং সচল রাখার জন্য)
     threading.Thread(target=run_flask, daemon=True).start()
     
-    # টেলিগ্রাম অ্যাপ্লিকেশন বিল্ড
-    application = ApplicationBuilder().token(BOT_TOKEN).build()
+    # application তৈরি করার সময় post_init যোগ করা হয়েছে
+    application = ApplicationBuilder().token(BOT_TOKEN).post_init(post_init).build()
     
-    # হ্যান্ডলার অ্যাড করা
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("status", status))
     application.add_handler(CommandHandler("post", post))
@@ -176,8 +184,8 @@ if __name__ == "__main__":
     
     print("Bot is starting...")
     
-    # Python 3.14 + Render এর জন্য ইভেন্ট লুপ ফিক্স
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     application.run_polling(drop_pending_updates=True)
+
         
