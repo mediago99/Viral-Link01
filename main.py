@@ -139,7 +139,7 @@ async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
         })
         
         # চ্যানেলে পোস্ট করা
-        kb = [[InlineKeyboardButton("🎬 Watch Movie (Open App)", web_app=WebAppInfo(url=APP_URL))]]
+        kb = [[InlineKeyboardButton("🎬 Watch Movie (Open App)", web_app=WebAppInfo(url=MOVIE_APP_URL))]]
         await context.bot.send_photo(
             chat_id=CHANNEL_USERNAME, 
             photo=image_url, 
@@ -174,7 +174,7 @@ async def post_init(application):
         await application.bot.set_chat_menu_button(
             menu_button=MenuButtonWebApp(
                 text="ভিডিও দেখুন", 
-                web_app=WebAppInfo(url=APP_URL)
+                web_app=WebAppInfo(url=MOVIE_APP_URL)
             )
         )
         print("Menu Button Configured Successfully!")
