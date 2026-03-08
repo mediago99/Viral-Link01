@@ -31,6 +31,7 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN")
 ADMIN_ID = 6311806060  
 CHANNEL_USERNAME = "@viralmoviehubbd"
 APP_URL = os.environ.get("APP_URL") 
+MOVIE_APP_URL = "https://mediago99.github.io/Viral-Link01/"
 FIREBASE_DB_URL = "https://viralmoviehubbd-default-rtdb.firebaseio.com/"
 FIREBASE_CREDS = os.environ.get("FIREBASE_CREDENTIALS")
 
