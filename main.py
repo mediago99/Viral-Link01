@@ -146,7 +146,7 @@ async def post_init(application):
         await application.bot.set_chat_menu_button(
             menu_button=MenuButtonWebApp(
                 text="ভিডিও দেখুন", 
-                web_app=WebAppInfo(url=MOVIE_APP_FRONTEND)
+                web_app=WebAppInfo(url=MOVIE_APP_URL)
             )
         )
         print("Menu Button Configured Successfully!")
