@@ -11,17 +11,16 @@ from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandle
 
 app = Flask(__name__)
 
-# ---------------- WEB SERVER (Render Port Binding) ----------------
+# ---------------- WEB SERVER ----------------
 @app.route('/')
 def home():
-    return "Bot is Active and Running!"
+    return "Bot is Running Perfectly!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 10000))
-    # debug=False এবং use_reloader=False রাখা জরুরি
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
 
-# ---------------- CONFIG & FIREBASE ----------------
+# ---------------- CONFIG ----------------
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 ADMIN_ID = int(os.environ.get("ADMIN_ID", "0"))
 CHANNEL_USERNAME = "@viralmoviehubbd"
@@ -29,6 +28,7 @@ APP_URL = os.environ.get("APP_URL")
 FIREBASE_DB_URL = "https://viralmoviehubbd-default-rtdb.firebaseio.com/"
 FIREBASE_CREDS = os.environ.get("FIREBASE_CREDENTIALS")
 
+# ---------------- FIREBASE ----------------
 if not firebase_admin._apps:
     try:
         cred_dict = json.loads(FIREBASE_CREDS)
@@ -60,28 +60,27 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if ref_by and ref_by != user_id:
             r = user_ref.child(ref_by).get() or {"referrals": 0, "coins": 0}
             user_ref.child(ref_by).update({"referrals": r.get("referrals", 0) + 1, "coins": r.get("coins", 0) + 100})
-    await show_menu(update, context)
-
-async def show_menu(update, context):
-    user_id = str(update.effective_user.id)
+    
     is_joined = await is_subscribed(context.bot, user_id)
     if not is_joined:
         kb = [[InlineKeyboardButton("📢 Join Channel", url=f"https://t.me/{CHANNEL_USERNAME[1:]}")],
               [InlineKeyboardButton("✅ Joined", callback_data="check_join")]]
-        msg = "❌ আগে জয়েন করুন!"
+        await update.message.reply_text("❌ আগে চ্যানেলে জয়েন করুন", reply_markup=InlineKeyboardMarkup(kb))
     else:
-        kb = [[InlineKeyboardButton("🎬 Open Movie App", callback_data="open_app")],
-              [InlineKeyboardButton("🚀 Referral", callback_data="get_ref")]]
-        msg = "🎬 **Viral Movie Hub**"
-    
-    if update.callback_query: await update.callback_query.edit_message_text(msg, reply_markup=InlineKeyboardMarkup(kb), parse_mode=ParseMode.MARKDOWN)
-    else: await update.message.reply_text(msg, reply_markup=InlineKeyboardMarkup(kb), parse_mode=ParseMode.MARKDOWN)
+        kb = [[InlineKeyboardButton("🎬 Open Movie App", callback_data="open_app")]]
+        await update.message.reply_text("🎬 Viral Movie Hub এ স্বাগতম", reply_markup=InlineKeyboardMarkup(kb))
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = str(update.effective_user.id)
-    if query.data == "check_join": await show_menu(update, context)
+    if query.data == "check_join":
+        is_joined = await is_subscribed(context.bot, user_id)
+        if is_joined:
+            await query.edit_message_text("✅ ধন্যবাদ জয়েন করার জন্য!", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🎬 Open App", callback_data="open_app")]]))
+        else:
+            await query.answer("❌ এখনো জয়েন করেননি!", show_alert=True)
+            
     elif query.data == "open_app":
         user = user_ref.child(user_id).get() or {}
         refs = user.get("referrals", 0)
@@ -89,22 +88,35 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             bot_me = await context.bot.get_me()
             await query.edit_message_text(f"🔒 ৫ রেফারেল লাগবে।\n{progress_bar(refs)}\nলিংক: `https://t.me/{bot_me.username}?start={user_id}`", parse_mode=ParseMode.MARKDOWN)
         else:
-            await query.edit_message_text("✅ আনলকড!", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🎬 Open App", web_app={"url": APP_URL})]]))
+            await query.edit_message_text("✅ আনলকড!", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🎬 Open WebApp", web_app={"url": APP_URL})]]))
 
 # ---------------- MAIN RUNNER ----------------
-def main():
-    # ১. প্রথমে Flask থ্রেড চালু করুন যাতে Render পোর্ট খুঁজে পায়
+async def main():
+    # Flask থ্রেড শুরু করা
     threading.Thread(target=run_flask, daemon=True).start()
 
-    # ২. টেলিগ্রাম বট সেটআপ
+    # বট কনফিগার করা
     application = ApplicationBuilder().token(BOT_TOKEN).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(button_handler))
 
     print("Bot is starting...")
-    # ৩. run_polling সরাসরি ব্যবহার করুন, এটি Render-এর জন্য সবচেয়ে ভালো কাজ করে
-    application.run_polling(drop_pending_updates=True)
+    
+    # এটি Python 3.14 এবং Render এর জন্য সবচেয়ে নিরাপদ উপায়
+    async with application:
+        await application.initialize()
+        await application.start()
+        await application.updater.start_polling(drop_pending_updates=True)
+        # লুপ সচল রাখতে
+        while True:
+            await asyncio.sleep(15)
 
 if __name__ == "__main__":
-    main()
+    try:
+        # মেইন থ্রেডে লুপ সেট করা
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(main())
+    except (KeyboardInterrupt, SystemExit):
+        pass
     
