@@ -9,12 +9,14 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, WebAppI
 from telegram.constants import ParseMode
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
 
+from flask import Flask, send_from_directory
+
 app = Flask(__name__)
 
 # ---------------- WEB SERVER ----------------
 @app.route('/')
 def home():
-    return "Bot is Running Perfectly!"
+    return send_from_directory('.', 'index.html')
 
 def run_flask():
     port = int(os.environ.get("PORT", 10000))
