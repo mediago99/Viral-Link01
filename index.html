@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Viral Movie Hub Premium</title>
+    
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
     
@@ -18,64 +20,125 @@
             --card-bg: #1a1b3d;
             --accent-color: #a855f7;
             --text-color: #ffffff;
+            --success-color: #22c55e;
         }
-        body { background-color: var(--bg-color); color: var(--text-color); font-family: 'Segoe UI', sans-serif; margin: 0; padding-bottom: 80px; overflow-x: hidden; }
-        .header { text-align: center; padding: 20px; background: var(--card-bg); border-radius: 0 0 25px 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-        .header h1 { color: var(--accent-color); margin: 0; font-size: 22px; text-transform: uppercase; }
-        .movie-card { background: var(--card-bg); margin: 15px; border-radius: 18px; overflow: hidden; border: 1px solid rgba(255,255,255,0.05); transition: 0.3s; }
-        .movie-card img { width: 100%; height: 210px; object-fit: cover; }
-        .movie-info { padding: 15px; }
-        .unlock-btn { background: linear-gradient(90deg, #ff8a00, #e52e71); border: none; color: white; padding: 14px; width: 100%; border-radius: 30px; font-weight: bold; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; transition: 0.3s; }
-        .unlock-btn:disabled { background: #444 !important; cursor: not-allowed; }
+        body { 
+            background-color: var(--bg-color); 
+            color: var(--text-color); 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            margin: 0; 
+            padding-bottom: 30px; 
+            user-select: none;
+        }
+        .header { 
+            text-align: center; 
+            padding: 25px 15px; 
+            background: linear-gradient(180deg, var(--card-bg), var(--bg-color)); 
+            border-radius: 0 0 25px 25px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.4); 
+        }
+        .header h1 { color: var(--accent-color); margin: 0; font-size: 24px; letter-spacing: 1px; }
         
-        /* Bottom Nav */
-        .bottom-nav { position: fixed; bottom: 0; width: 100%; background: #161730; display: flex; justify-content: space-around; padding: 12px 0; border-top: 1px solid rgba(255,255,255,0.1); z-index: 1000; }
-        .nav-item { text-align: center; color: #8e8e93; font-size: 11px; cursor: pointer; flex: 1; }
-        .nav-item i { font-size: 22px; display: block; margin-bottom: 4px; }
-        .nav-item.active { color: var(--accent-color); }
+        #movie-list { padding: 10px; }
+        
+        .movie-card { 
+            background: var(--card-bg); 
+            margin: 15px 0; 
+            border-radius: 20px; 
+            overflow: hidden; 
+            border: 1px solid rgba(255,255,255,0.08); 
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+        }
+        .movie-card img { width: 100%; height: 220px; object-fit: cover; border-bottom: 2px solid var(--accent-color); }
+        .movie-info { padding: 15px; }
+        .movie-info h3 { margin: 0 0 12px 0; font-size: 18px; color: #efefff; }
+        
+        .unlock-btn { 
+            background: linear-gradient(90deg, #ff8a00, #e52e71); 
+            border: none; 
+            color: white; 
+            padding: 15px; 
+            width: 100%; 
+            border-radius: 12px; 
+            font-weight: bold; 
+            font-size: 15px;
+            cursor: pointer; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            gap: 10px; 
+            transition: transform 0.2s;
+        }
+        .unlock-btn:active { transform: scale(0.98); }
+        .unlock-btn:disabled { background: #444 !important; opacity: 0.8; cursor: not-allowed; }
+        
+        .watch-now { background: var(--success-color) !important; box-shadow: 0 0 15px rgba(34, 197, 94, 0.4); }
+
+        /* Progress Bar */
+        .progress-container { width: 100%; background: #000; height: 6px; border-radius: 10px; margin-top: 10px; overflow: hidden; }
+        .progress-bar { height: 100%; background: var(--accent-color); width: 0%; transition: width 0.3s; }
     </style>
 </head>
 <body>
 
 <div id="home-page">
     <div class="header">
-        <h1>VIRAL ZONE <i class="fa fa-fire"></i></h1>
-        <p style="font-size: 11px; opacity: 0.6;">Watch Ads to Unlock Movies</p>
+        <h1>VIRAL MOVIE HUB <i class="fa fa-play-circle"></i></h1>
+        <p style="font-size: 12px; opacity: 0.7; margin-top: 5px;">৫টি অ্যাড দেখুন এবং মুভি আনলক করুন</p>
     </div>
-    <div id="movie-list"></div>
+    <div id="movie-list">
+        </div>
 </div>
 
 <script>
+// Telegram WebApp Setup
 const tg = window.Telegram.WebApp;
 tg.expand();
 
-// Firebase Init
-const firebaseConfig = { databaseURL: "https://viralmoviehubbd-default-rtdb.firebaseio.com/" };
+// Firebase Configuration
+const firebaseConfig = { 
+    databaseURL: "https://viralmoviehubbd-default-rtdb.firebaseio.com/" 
+};
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// Monetag Direct Link (আপনার স্মার্টলিঙ্ক)
+// Monetag SmartLink
 const MONETAG_SMARTLINK = "https://omg10.com/4/10611800";
-let counts = JSON.parse(localStorage.getItem('adCounts')) || {};
+
+// Local Storage থেকে ইউজারের প্রগ্রেস লোড করা
+let adProgress = JSON.parse(localStorage.getItem('user_ad_progress')) || {};
 
 function loadMovies() {
     db.ref('movies').on('value', (snapshot) => {
         const list = document.getElementById('movie-list');
         list.innerHTML = '';
+        
+        if (!snapshot.exists()) {
+            list.innerHTML = '<p style="text-align:center; margin-top:50px; opacity:0.5;">কোনো মুভি পাওয়া যায়নি!</p>';
+            return;
+        }
+
         snapshot.forEach((child) => {
             const movie = child.val();
             const id = child.key;
-            if(!counts[id]) counts[id] = 0;
             
-            const btnText = counts[id] >= 5 ? "WATCH NOW" : `UNLOCK — ${counts[id]}/5 ADS`;
-            const btnColor = counts[id] >= 5 ? "green" : "";
+            if(!adProgress[id]) adProgress[id] = 0;
+            
+            const isUnlocked = adProgress[id] >= 5;
+            const btnText = isUnlocked ? "🎬 WATCH NOW" : `🔓 UNLOCK (${adProgress[id]}/5 ADS)`;
+            const btnClass = isUnlocked ? "unlock-btn watch-now" : "unlock-btn";
+            const progressWidth = (adProgress[id] / 5) * 100;
 
             list.innerHTML += `
             <div class="movie-card">
-                <img src="${movie.image_url || movie.img}"> 
+                <img src="${movie.image_url || 'https://via.placeholder.com/400x220'}" alt="Poster"> 
                 <div class="movie-info">
-                    <h3>${movie.title || movie.name}</h3>
-                    <button class="unlock-btn" style="background: ${btnColor}" onclick="handleAction('${id}', '${movie.video_url || movie.url}')" id="btn-${id}">
+                    <h3>${movie.title}</h3>
+                    <div class="progress-container">
+                        <div class="progress-bar" style="width: ${progressWidth}%"></div>
+                    </div>
+                    <p style="font-size:11px; margin: 5px 0 15px 0; opacity:0.6;">প্রগ্রেস: ${adProgress[id]} / 5 অ্যাড</p>
+                    <button class="${btnClass}" onclick="handleUnlock('${id}', '${movie.video_url}')" id="btn-${id}">
                         ${btnText}
                     </button>
                 </div>
@@ -84,63 +147,58 @@ function loadMovies() {
     });
 }
 
-async function handleAction(id, url) {
-    if(counts[id] < 5) {
-        const btn = document.getElementById(`btn-${id}`);
-        btn.disabled = true;
-        
-        // ১. পপ-আপ অ্যাড দেখানোর চেষ্টা
-        if (typeof show_10500197 === 'function') {
-            show_10500197().then(() => {
-                processAd(id, url);
-            }).catch(() => {
-                // যদি SDK কাজ না করে তবে স্মার্টলিঙ্ক ওপেন হবে
-                window.open(MONETAG_SMARTLINK, '_blank');
-                processAd(id, url);
-            });
-        } else {
-            window.open(MONETAG_SMARTLINK, '_blank');
-            processAd(id, url);
-        }
-    } else {
-        // ৫টি অ্যাড দেখা শেষ হলে স্মার্টলিঙ্কের মাধ্যমে মুভি ওপেন হবে (ডাবল ইনকাম)
-        window.open(MONETAG_SMARTLINK, '_blank'); 
-        setTimeout(() => {
-            window.location.href = url;
-        }, 1000);
-    }
-}
-
-function processAd(id, url) {
-    let sec = 15; // ১৫ সেকেন্ড ওয়েট টাইম
+async function handleUnlock(id, url) {
     const btn = document.getElementById(`btn-${id}`);
     
-    const timer = setInterval(() => {
-        sec--;
-        btn.innerHTML = `অ্যাড ভেরিফাই হচ্ছে... ${sec}s`;
-        if(sec <= 0) {
-            clearInterval(timer);
-            counts[id]++;
-            localStorage.setItem('adCounts', JSON.stringify(counts));
+    // যদি ৫টি অ্যাড দেখা হয়ে যায়
+    if(adProgress[id] >= 5) {
+        // সরাসরি মুভি লিঙ্কে পাঠিয়ে দেওয়া (অরিজিনাল কন্টেন্ট)
+        window.location.href = url;
+        return;
+    }
+
+    // অ্যাড দেখানোর প্রক্রিয়া শুরু
+    btn.disabled = true;
+    
+    // ১. Monetag অ্যাড ওপেন করা
+    if (typeof show_10500197 === 'function') {
+        show_10500197().catch(() => {
+            window.open(MONETAG_SMARTLINK, '_blank');
+        });
+    } else {
+        window.open(MONETAG_SMARTLINK, '_blank');
+    }
+
+    // ২. ১৫ সেকেন্ডের ওয়েটিং টাইম (যাতে অ্যাড লোড হয় এবং ইনকাম হয়)
+    let timeLeft = 15;
+    const originalText = btn.innerHTML;
+    
+    const countdown = setInterval(() => {
+        timeLeft--;
+        btn.innerHTML = `<i class="fa fa-spinner fa-spin"></i> ভেরিফাই হচ্ছে... ${timeLeft}s`;
+        
+        if(timeLeft <= 0) {
+            clearInterval(countdown);
+            
+            // প্রগ্রেস আপডেট
+            adProgress[id]++;
+            localStorage.setItem('user_ad_progress', JSON.stringify(adProgress));
+            
+            // বাটন রিসেট
             btn.disabled = false;
-            updateUI(id, url);
+            loadMovies(); // UI আপডেট করার জন্য পুনরায় লোড
+            
+            // ইউজারকে মেসেজ দেওয়া
+            tg.HapticFeedback.notificationOccurred('success');
         }
     }, 1000);
 }
 
-function updateUI(id, url) {
-    const b = document.getElementById(`btn-${id}`);
-    if(counts[id] >= 5) {
-        b.innerHTML = "WATCH NOW";
-        b.style.background = "green";
-    } else {
-        b.innerHTML = `UNLOCK — ${counts[id]}/5 ADS`;
-    }
-}
-
-// অ্যাপ খোলার সাথে সাথে একটি ইন্টারস্টিশিয়াল অ্যাড লোড হবে
+// ইনিশিয়াল লোড
 window.onload = () => {
     loadMovies();
+    
+    // অ্যাপ খোলার ৩ সেকেন্ড পর একটি অটো অ্যাড (Interstitial) ট্রাই করা
     setTimeout(() => {
         if(typeof show_10500197 === 'function') show_10500197();
     }, 3000);
@@ -148,5 +206,5 @@ window.onload = () => {
 
 </script>
 </body>
-    </html>
-    
+</html>
+
