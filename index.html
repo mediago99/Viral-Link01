@@ -23,13 +23,11 @@
         .header { text-align: center; padding: 20px; background: var(--card-bg); border-radius: 0 0 25px 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
         .header h1 { color: #a855f7; margin: 0; font-size: 22px; text-transform: uppercase; }
 
-        /* Movie List & Cards */
         .movie-card { background: var(--card-bg); margin: 15px; border-radius: 18px; overflow: hidden; border: 1px solid rgba(255,255,255,0.05); }
         .movie-card img { width: 100%; height: 210px; object-fit: cover; }
         .movie-info { padding: 15px; }
         .unlock-btn { background: linear-gradient(90deg, #ff8a00, #e52e71); border: none; color: white; padding: 14px; width: 100%; border-radius: 30px; font-weight: bold; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; }
 
-        /* Tutorial Page Design (As per your screenshot) */
         #tutorial-page { display: none; padding: 20px; background-color: var(--bg-color); min-height: 100vh; }
         .tut-title { display: flex; align-items: center; gap: 10px; color: var(--accent-color); font-size: 22px; margin-bottom: 20px; }
         .no-video { background: var(--card-bg); height: 150px; border-radius: 15px; display: flex; align-items: center; justify-content: center; color: #8e8e93; margin-bottom: 30px; border: 1px dashed #333; }
@@ -39,7 +37,6 @@
         .tut-step h3 { margin: 0 0 5px 0; font-size: 18px; }
         .tut-step p { margin: 0; font-size: 14px; opacity: 0.8; line-height: 1.5; }
 
-        /* Bottom Nav */
         .bottom-nav { position: fixed; bottom: 0; width: 100%; background: #161730; display: flex; justify-content: space-around; padding: 12px 0; border-top: 1px solid rgba(255,255,255,0.1); z-index: 1000; }
         .nav-item { text-align: center; color: #8e8e93; font-size: 11px; cursor: pointer; flex: 1; }
         .nav-item i { font-size: 22px; display: block; margin-bottom: 4px; }
@@ -60,7 +57,6 @@
         <div class="tut-title">
             <i class="fa fa-book-open"></i> কিভাবে আনলক করবেন
         </div>
-        
         <div class="no-video">No tutorial video configured yet.</div>
 
         <div class="tut-step">
@@ -68,25 +64,21 @@
             <h3>Unlock এ ক্লিক করুন</h3>
             <p>যে ভিডিওটি দেখতে চান তার নিচে "UNLOCK" বাটনে ক্লিক করুন।</p>
         </div>
-
         <div class="tut-step">
             <div class="step-num">2</div>
             <h3>এড দেখুন</h3>
-            <p>১৫ সেকেন্ডের এডটি সম্পূর্ণ দেখুন। এড শেষ হওয়ার পর আপনা-আপনি আনলক হয়ে যাবে।</p>
+            <p>২৫ সেকেন্ডের অ্যাডটি সম্পূর্ণ দেখুন। এড শেষ হওয়ার পর ভিডিও আনলক হবে।</p>
         </div>
-
         <div class="tut-step">
             <div class="step-num">3</div>
-            <h3>ভিডিও ডাউনলোড করুন</h3>
+            <h3>ভিডিও দেখুন</h3>
             <p>৫টি এড দেখা শেষ হলে ভিডিওটি অটোমেটিক চালু হবে।</p>
         </div>
-        
         <div class="tut-step">
-    <div class="step-num">4</div>
-    <h3>দৈনিক লিমিট</h3>
-    <p>প্রতিদিন সর্বোচ্চ ২০ টি এড দেখতে পারবেন। প্রতিটি ভিডিও আনলক করতে ৫টি করে এড দেখা প্রয়োজন।</p>
+            <div class="step-num">4</div>
+            <h3>দৈনিক লিমিট</h3>
+            <p>প্রতিদিন সর্বোচ্চ ২০ টি এড দেখার সুযোগ। প্রতিটি ভিডিও আনলক করতে ৫টি এড দেখা প্রয়োজন।</p>
         </div> 
-        
     </div>
 
     <nav class="bottom-nav">
@@ -104,7 +96,7 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        const MONETAG_LINK = "https://omg10.com/4/10611800"; // আপনার ডিরেক্ট লিঙ্ক দিন
+        const MONETAG_LINK = "https://omg10.com/4/10611800";
         let counts = {};
 
         function loadMovies() {
@@ -116,52 +108,65 @@
                     const id = child.key;
                     if(!counts[id]) counts[id] = 0;
                     list.innerHTML += `
- <div class="movie-card">
-        <img src="${movie.image_url || movie.img}"> 
-        <div class="movie-info">
-            <h3>${movie.title || movie.name}</h3>
-            <button class="unlock-btn" onclick="doUnlock('${id}', '${movie.video_url || movie.url}')" id="btn-${id}">
-                UNLOCK — ${counts[id]}/5 ADS
-            </button>
-        </div>
-    </div>`;
+<div class="movie-card">
+    <img src="${movie.image_url || movie.img}"> 
+    <div class="movie-info">
+        <h3>${movie.title || movie.name}</h3>
+        <button class="unlock-btn" onclick="doUnlock('${id}', '${movie.video_url || movie.url}')" id="btn-${id}">
+            UNLOCK — ${counts[id]}/5 ADS
+        </button>
+    </div>
+</div>`;
                 });
             });
         }
 
         function doUnlock(id, url) {
-            if (counts[id] < 5) {
-                if (typeof show_10500197 === 'function') {
-                    show_10500197().then(() => { counts[id]++; update(id, url); });
-                } else {
-                    window.open(MONETAG_LINK, '_blank');
-                    counts[id]++; update(id, url);
-                }
-            } else { window.location.href = url; }
-        }
-
-        function update(id, url) {
             const b = document.getElementById(`btn-${id}`);
-            if (counts[id] >= 5) { b.innerHTML = "WATCH NOW"; b.style.background = "green"; }
-            else { b.innerHTML = `UNLOCK — ${counts[id]}/5 ADS`; }
+            if (counts[id] >= 5) {
+                window.location.href = url;
+                return;
+            }
+
+            // disable button
+            b.disabled = true;
+            let sec = 25; // 25 seconds timer
+            const originalText = b.innerHTML;
+            b.innerHTML = `AD Playing... ${sec}s`;
+
+            const timer = setInterval(() => {
+                sec--;
+                if(sec > 0){
+                    b.innerHTML = `AD Playing... ${sec}s`;
+                } else {
+                    clearInterval(timer);
+                    counts[id]++;
+                    if(counts[id] >= 5){
+                        b.innerHTML = "WATCH NOW";
+                        b.style.background = "green";
+                    } else {
+                        b.innerHTML = `UNLOCK — ${counts[id]}/5 ADS`;
+                        b.disabled = false;
+                    }
+                }
+            }, 1000);
+
+            // trigger monetag ad in background
+            if (typeof show_10500197 === 'function') {
+                show_10500197().then(() => {});
+            } else {
+                window.open(MONETAG_LINK, '_blank');
+            }
         }
 
         function showPage(p) {
-            const h = document.getElementById('home-page');
-            const t = document.getElementById('tutorial-page');
-            const nh = document.getElementById('nav-home');
-            const nt = document.getElementById('nav-tut');
-
-            if(p === 'home') {
-                h.style.display = 'block'; t.style.display = 'none';
-                nh.classList.add('active'); nt.classList.remove('active');
-            } else {
-                h.style.display = 'none'; t.style.display = 'block';
-                nh.classList.remove('active'); nt.classList.add('active');
-            }
+            document.getElementById('home-page').style.display = (p==='home')?'block':'none';
+            document.getElementById('tutorial-page').style.display = (p==='tutorial')?'block':'none';
+            document.getElementById('nav-home').classList.toggle('active', p==='home');
+            document.getElementById('nav-tut').classList.toggle('active', p==='tutorial');
         }
+
         loadMovies();
     </script>
 </body>
-    </html>
-    
+</html>
