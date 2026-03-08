@@ -167,9 +167,6 @@ async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # --- এরর সমাধান করা মেনু বাটন ফাংশন ---
 async def post_init(application):
-    # আপনার গিটহাব পেজ লিঙ্ক
-    MOVIE_APP_URL = "https://mediago99.github.io/Viral-Link01/" 
-    
     # এখানে MenuButtonWebApp ব্যবহার করা হয়েছে যা 'type' ফিল্ড এরর সমাধান করবে
     try:
         await application.bot.set_chat_menu_button(
