@@ -139,25 +139,45 @@ async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ---------------- MAIN ----------------
 async def main():
+    # ফ্লস্ক সার্ভার ব্যাকগ্রাউন্ডে চালানো
     threading.Thread(target=run_flask, daemon=True).start()
     
+    # অ্যাপ্লিকেশন তৈরি
     application = ApplicationBuilder().token(BOT_TOKEN).build()
     
+    # হ্যান্ডলার যুক্ত করা
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(button_handler))
     application.add_handler(CommandHandler("post", post))
     
     print("Bot Started Successfully!")
-    
-    # Python 3.14 + Render safe polling
-    await application.initialize()
-    await application.start()
-    await application.updater.start_polling(drop_pending_updates=True)
-    
-    while True:
-        await asyncio.sleep(15)
+
+    # run_polling() ব্যবহার করা সবচেয়ে নিরাপদ, এটি ইভেন্ট লুপের ঝামেলা করে না
+    async with application:
+        await application.initialize()
+        await application.start()
+        await application.updater.start_polling(drop_pending_updates=True)
+        
+        # বট চালু রাখার জন্য ইনফিনিট লুপ
+        while True:
+            await asyncio.sleep(3600) # প্রতি ১ ঘণ্টায় একবার চেক করবে
 
 # ---------------- RUN ----------------
 if __name__ == "__main__":
     import asyncio
-    asyncio.run(main())
+    try:
+        # সরাসরি run_polling ব্যবহার করা সহজ সমাধান
+        application = ApplicationBuilder().token(BOT_TOKEN).build()
+        application.add_handler(CommandHandler("start", start))
+        application.add_handler(CallbackQueryHandler(button_handler))
+        application.add_handler(CommandHandler("post", post))
+        
+        # Flask চালানো
+        threading.Thread(target=run_flask, daemon=True).start()
+        
+        print("Bot is polling...")
+        application.run_polling(drop_pending_updates=True)
+        
+    except Exception as e:
+        print(f"Fatal Error: {e}")
+        
