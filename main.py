@@ -10,7 +10,7 @@ from telegram import (
     InlineKeyboardMarkup, 
     Update, 
     WebAppInfo, 
-    MenuButtonWebApp  # এটি এরর সমাধানের জন্য যুক্ত করা হয়েছে
+    MenuButtonWebApp 
 )
 from telegram.constants import ParseMode 
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
@@ -35,6 +35,9 @@ MOVIE_APP_URL = "https://mediago99.github.io/Viral-Link01/"
 FIREBASE_DB_URL = "https://viralmoviehubbd-default-rtdb.firebaseio.com/"
 FIREBASE_CREDS = os.environ.get("FIREBASE_CREDENTIALS")
 
+# কতজন রেফার লাগবে? (৫ থেকে কমিয়ে ১ করা হয়েছে)
+REFERRAL_COUNT_NEEDED = 1 
+
 # ---------------- FIREBASE SETUP ----------------
 if not firebase_admin._apps:
     try:
@@ -55,7 +58,7 @@ async def is_subscribed(bot, user_id):
     except:
         return False
 
-def progress_bar(count, total=5):
+def progress_bar(count, total=REFERRAL_COUNT_NEEDED):
     filled = "█" * min(count, total)
     empty = "░" * max(0, total - count)
     return f"[{filled}{empty}] {int((min(count, total)/total)*100)}%"
@@ -77,7 +80,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_subscribed(context.bot, user_id):
         kb = [[InlineKeyboardButton("📢 Join Channel", url=f"https://t.me/{CHANNEL_USERNAME[1:]}")],
               [InlineKeyboardButton("✅ Joined", callback_data="check_join")]]
-        await update.message.reply_text("❌ আগে আমাদের চ্যানেলে জয়েন করুন।", reply_markup=InlineKeyboardMarkup(kb))
+        await update.message.reply_text("❌ মুভি দেখতে হলে আগে আমাদের চ্যানেলে জয়েন করুন।", reply_markup=InlineKeyboardMarkup(kb))
     else:
         kb = [[InlineKeyboardButton("🎬 Open Movie App", callback_data="open_app")]]
         await update.message.reply_text("🎬 Viral Movie Hub এ স্বাগতম!", reply_markup=InlineKeyboardMarkup(kb))
@@ -87,7 +90,7 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = user_ref.child(user_id).get() or {"referrals": 0, "coins": 0}
     refs = user.get("referrals", 0)
     bot_me = await context.bot.get_me()
-    text = f"📊 **আপনার স্ট্যাটাস**\n\n👥 মোট রেফার: {refs}/5\n📈 অগ্রগতি: {progress_bar(refs)}\n\n🔗 লিংক: `https://t.me/{bot_me.username}?start={user_id}`"
+    text = f"📊 **আপনার স্ট্যাটাস**\n\n👥 মোট রেফার: {refs}/{REFERRAL_COUNT_NEEDED}\n📈 অগ্রগতি: {progress_bar(refs)}\n\n🔗 লিংক: `https://t.me/{bot_me.username}?start={user_id}`"
     await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -105,16 +108,49 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data == "open_app":
         user = user_ref.child(user_id).get() or {}
         refs = user.get("referrals", 0)
-        if refs < 5:
+        if refs < REFERRAL_COUNT_NEEDED:
             bot_me = await context.bot.get_me()
-            await query.edit_message_text(f"🔒 ৫ জন রেফার লাগবে। আপনার আছে: {refs}/5\n{progress_bar(refs)}", parse_mode=ParseMode.MARKDOWN)
+            await query.edit_message_text(f"🔒 {REFERRAL_COUNT_NEEDED} জন রেফার লাগবে। আপনার আছে: {refs}/{REFERRAL_COUNT_NEEDED}\n{progress_bar(refs)}", parse_mode=ParseMode.MARKDOWN)
         else:
             kb = [[InlineKeyboardButton("🚀 Launch Mini App", web_app=WebAppInfo(url=APP_URL))]]
-            await query.edit_message_text("✅ ৫ রেফার পূর্ণ হয়েছে! নিচের বাটনে ক্লিক করুন:", reply_markup=InlineKeyboardMarkup(kb))
+            await query.edit_message_text("✅ রেফার পূর্ণ হয়েছে! নিচের বাটনে ক্লিক করুন:", reply_markup=InlineKeyboardMarkup(kb))
+
+# ব্রডকাস্ট ফাংশন: এটি সবার ইনবক্সে মেসেজ পাঠাবে এবং অ্যাক্টিভ ইউজার রিপোর্ট দেবে
+async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id != ADMIN_ID: return
+    
+    if not update.message.reply_to_message:
+        await update.message.reply_text("❌ যে মেসেজটি সবার কাছে পাঠাতে চান, সেটির ওপর রিপ্লাই দিয়ে /broadcast লিখুন।")
+        return
+
+    reply_msg = update.message.reply_to_message
+    all_users = user_ref.get()
+    if not all_users: 
+        await update.message.reply_text("ডেটাবেজে কোনো ইউজার নেই!")
+        return
+
+    status_msg = await update.message.reply_text(f"⏳ ব্রডকাস্ট শুরু হয়েছে...\nমোট ইউজার: {len(all_users)}")
+    
+    success = 0
+    blocked = 0
+    
+    for user_id in all_users:
+        try:
+            # কপি মেসেজ ফাংশন ব্যবহার করা হয়েছে যাতে টেক্সট, ফটো সব পাঠানো যায়
+            await context.bot.copy_message(
+                chat_id=user_id,
+                from_chat_id=reply_msg.chat.id,
+                message_id=reply_msg.message_id
+            )
+            success += 1
+            await asyncio.sleep(0.05) # রেট লিমিট এড়াতে ছোট বিরতি
+        except Exception:
+            blocked += 1
+            
+    await status_msg.edit_text(f"✅ ব্রডকাস্ট সম্পন্ন!\n\n🚀 সফল: {success}\n🚫 ইনঅ্যাক্টিভ/ব্লক: {blocked}\n📊 মোট ইউজার ডেটা: {len(all_users)}")
 
 async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID: return
-    
     full_text = " ".join(context.args)
     data = [i.strip() for i in full_text.split("|")]
     
@@ -123,16 +159,10 @@ async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     movie_name, image_url, movie_link = data[0], data[1], data[2]
-    
-    # এটি মিনি অ্যাপে (লকসহ) মুভি যোগ করবে
     movie_ref.push({"title": movie_name, "image_url": image_url, "video_url": movie_link})
     
-    # চ্যানেলের জন্য বাটন তৈরি (ইউজারকে বটের ভেতর পাঠাবে)
     bot_me = await context.bot.get_me()
-    bot_url = f"https://t.me/{bot_me.username}"
-    
-    # চ্যানেলে 'url' বাটন দিতে হবে, 'web_app' বাটন নয়
-    kb = [[InlineKeyboardButton("🎬 Watch Movie", url=bot_url)]]
+    kb = [[InlineKeyboardButton("🎬 Watch Movie", url=f"https://t.me/{bot_me.username}")]]
     
     await context.bot.send_photo(
         chat_id=CHANNEL_USERNAME, 
@@ -141,7 +171,7 @@ async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup(kb), 
         parse_mode=ParseMode.MARKDOWN
     )
-    await update.message.reply_text("✅ চ্যানেলে পোস্ট সফল হয়েছে এবং মিনি অ্যাপে যোগ হয়েছে!")
+    await update.message.reply_text("✅ চ্যানেলে পোস্ট সফল হয়েছে! সবাইকে পাঠাতে এই মেসেজের ওপর রিপ্লাই দিয়ে /broadcast লিখুন।")
 
 async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID: return
@@ -154,9 +184,7 @@ async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🎬 মোট মুভি: {movie_count} টি")
     await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
 
-# --- এরর সমাধান করা মেনু বাটন ফাংশন ---
 async def post_init(application):
-    # এখানে MenuButtonWebApp ব্যবহার করা হয়েছে যা 'type' ফিল্ড এরর সমাধান করবে
     try:
         await application.bot.set_chat_menu_button(
             menu_button=MenuButtonWebApp(
@@ -164,26 +192,21 @@ async def post_init(application):
                 web_app=WebAppInfo(url=MOVIE_APP_URL)
             )
         )
-        print("Menu Button Configured Successfully!")
     except Exception as e:
         print(f"Failed to set Menu Button: {e}")
 
 # ---------------- RUN BOT ----------------
 if __name__ == "__main__":
     threading.Thread(target=run_flask, daemon=True).start()
-    
-    # application তৈরি করার সময় post_init এর মাধ্যমে মেনু বাটন সেট করা হবে
     application = ApplicationBuilder().token(BOT_TOKEN).post_init(post_init).build()
     
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("status", status))
     application.add_handler(CommandHandler("post", post))
     application.add_handler(CommandHandler("users", admin_stats))
+    application.add_handler(CommandHandler("broadcast", broadcast))
     application.add_handler(CallbackQueryHandler(button_handler))
     
-    print("Bot is starting...")
-    
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+    print("Bot is starting with Broadcast feature...")
     application.run_polling(drop_pending_updates=True)
     
