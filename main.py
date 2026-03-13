@@ -35,7 +35,6 @@ MOVIE_APP_URL = "https://mediago99.github.io/Viral-Link01/"
 FIREBASE_DB_URL = "https://viralmoviehubbd-default-rtdb.firebaseio.com/"
 FIREBASE_CREDS = os.environ.get("FIREBASE_CREDENTIALS")
 
-# কতজন রেফার লাগবে? (৫ থেকে কমিয়ে ১ করা হয়েছে)
 REFERRAL_COUNT_NEEDED = 1 
 
 # ---------------- FIREBASE SETUP ----------------
@@ -115,45 +114,33 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             kb = [[InlineKeyboardButton("🚀 Launch Mini App", web_app=WebAppInfo(url=APP_URL))]]
             await query.edit_message_text("✅ রেফার পূর্ণ হয়েছে! নিচের বাটনে ক্লিক করুন:", reply_markup=InlineKeyboardMarkup(kb))
 
-# ব্রডকাস্ট ফাংশন: এটি সবার ইনবক্সে মেসেজ পাঠাবে এবং অ্যাক্টিভ ইউজার রিপোর্ট দেবে
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID: return
-    
     if not update.message.reply_to_message:
-        await update.message.reply_text("❌ যে মেসেজটি সবার কাছে পাঠাতে চান, সেটির ওপর রিপ্লাই দিয়ে /broadcast লিখুন।")
+        await update.message.reply_text("❌ মেসেজের ওপর রিপ্লাই দিয়ে /broadcast লিখুন।")
         return
 
     reply_msg = update.message.reply_to_message
     all_users = user_ref.get()
-    if not all_users: 
-        await update.message.reply_text("ডেটাবেজে কোনো ইউজার নেই!")
-        return
+    if not all_users: return
 
-    status_msg = await update.message.reply_text(f"⏳ ব্রডকাস্ট শুরু হয়েছে...\nমোট ইউজার: {len(all_users)}")
-    
-    success = 0
-    blocked = 0
+    status_msg = await update.message.reply_text(f"⏳ ব্রডকাস্ট শুরু হয়েছে...\nমোট: {len(all_users)}")
+    success, blocked = 0, 0
     
     for user_id in all_users:
         try:
-            # কপি মেসেজ ফাংশন ব্যবহার করা হয়েছে যাতে টেক্সট, ফটো সব পাঠানো যায়
-            await context.bot.copy_message(
-                chat_id=user_id,
-                from_chat_id=reply_msg.chat.id,
-                message_id=reply_msg.message_id
-            )
+            await context.bot.copy_message(chat_id=user_id, from_chat_id=reply_msg.chat.id, message_id=reply_msg.message_id)
             success += 1
-            await asyncio.sleep(0.05) # রেট লিমিট এড়াতে ছোট বিরতি
+            await asyncio.sleep(0.05)
         except Exception:
             blocked += 1
             
-    await status_msg.edit_text(f"✅ ব্রডকাস্ট সম্পন্ন!\n\n🚀 সফল: {success}\n🚫 ইনঅ্যাক্টিভ/ব্লক: {blocked}\n📊 মোট ইউজার ডেটা: {len(all_users)}")
+    await status_msg.edit_text(f"✅ সম্পন্ন!\n🚀 সফল: {success}\n🚫 ব্লক: {blocked}")
 
 async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID: return
     full_text = " ".join(context.args)
     data = [i.strip() for i in full_text.split("|")]
-    
     if len(data) < 3:
         await update.message.reply_text("❌ ফরম্যাট: /post নাম | ইমেজ URL | মুভি লিঙ্ক")
         return
@@ -164,42 +151,33 @@ async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bot_me = await context.bot.get_me()
     kb = [[InlineKeyboardButton("🎬 Watch Movie", url=f"https://t.me/{bot_me.username}")]]
     
-    await context.bot.send_photo(
-        chat_id=CHANNEL_USERNAME, 
-        photo=image_url, 
-        caption=f"🎬 **{movie_name}**\n\nমুভিটি দেখতে নিচের বাটনে ক্লিক করুন।", 
-        reply_markup=InlineKeyboardMarkup(kb), 
-        parse_mode=ParseMode.MARKDOWN
-    )
-    await update.message.reply_text("✅ চ্যানেলে পোস্ট সফল হয়েছে! সবাইকে পাঠাতে এই মেসেজের ওপর রিপ্লাই দিয়ে /broadcast লিখুন।")
+    await context.bot.send_photo(chat_id=CHANNEL_USERNAME, photo=image_url, caption=f"🎬 **{movie_name}**\n\nমুভিটি দেখতে বাটনে ক্লিক করুন।", reply_markup=InlineKeyboardMarkup(kb), parse_mode=ParseMode.MARKDOWN)
+    await update.message.reply_text("✅ পোস্ট সফল! ব্রডকাস্ট করতে এই মেসেজে রিপ্লাই দিয়ে /broadcast লিখুন।")
 
 async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID: return
     all_users = user_ref.get()
     all_movies = movie_ref.get()
-    user_count = len(all_users) if all_users else 0
-    movie_count = len(all_movies) if all_movies else 0
-    text = (f"📊 **বট রিপোর্ট (অ্যাডমিন)**\n\n"
-            f"👤 মোট ইউজার: {user_count} জন\n"
-            f"🎬 মোট মুভি: {movie_count} টি")
-    await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
+    u_count = len(all_users) if all_users else 0
+    m_count = len(all_movies) if all_movies else 0
+    await update.message.reply_text(f"📊 **বট রিপোর্ট**\n\n👤 ইউজার: {u_count}\n🎬 মুভি: {m_count}")
 
 async def post_init(application):
     try:
-        await application.bot.set_chat_menu_button(
-            menu_button=MenuButtonWebApp(
-                text="ভিডিও দেখুন", 
-                web_app=WebAppInfo(url=MOVIE_APP_URL)
-            )
-        )
+        await application.bot.set_chat_menu_button(menu_button=MenuButtonWebApp(text="ভিডিও দেখুন", web_app=WebAppInfo(url=MOVIE_APP_URL)))
+        print("Menu Button Set!")
     except Exception as e:
-        print(f"Failed to set Menu Button: {e}")
+        print(f"Menu error: {e}")
 
-# ---------------- RUN BOT ----------------
+# ---------------- RUN BOT (Python 3.14 Fix) ----------------
 if __name__ == "__main__":
+    # Flask thread start
     threading.Thread(target=run_flask, daemon=True).start()
+    
+    # Application build
     application = ApplicationBuilder().token(BOT_TOKEN).post_init(post_init).build()
     
+    # Handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("status", status))
     application.add_handler(CommandHandler("post", post))
@@ -207,6 +185,7 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("broadcast", broadcast))
     application.add_handler(CallbackQueryHandler(button_handler))
     
-    print("Bot is starting with Broadcast feature...")
-    application.run_polling(drop_pending_updates=True)
+    print("Bot is starting...")
     
+    # Python 3.14 compatible run method
+    application.run_polling(drop_pending_updates=True, close_loop=False)
