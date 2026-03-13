@@ -20,7 +20,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Bot is Running Perfectly!"
+    return "Bot is Running Perfectly on Python 3.11!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 10000))
@@ -35,6 +35,7 @@ MOVIE_APP_URL = "https://mediago99.github.io/Viral-Link01/"
 FIREBASE_DB_URL = "https://viralmoviehubbd-default-rtdb.firebaseio.com/"
 FIREBASE_CREDS = os.environ.get("FIREBASE_CREDENTIALS")
 
+# রেফারেল সংখ্যা (আপনি চাইলে ১ থেকে ৫ করতে পারেন এখানে)
 REFERRAL_COUNT_NEEDED = 1 
 
 # ---------------- FIREBASE SETUP ----------------
@@ -66,6 +67,7 @@ def progress_bar(count, total=REFERRAL_COUNT_NEEDED):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
+    # ইউজার ডেটাবেজে না থাকলে সেভ করা এবং রেফারেল চেক করা
     if not user_ref.child(user_id).get():
         ref_by = context.args[0] if context.args else None
         user_ref.child(user_id).set({"referrals": 0, "coins": 0, "ref_by": ref_by})
@@ -76,6 +78,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "coins": r.get("coins", 0) + 100
             })
     
+    # সাবস্ক্রিপশন চেক
     if not await is_subscribed(context.bot, user_id):
         kb = [[InlineKeyboardButton("📢 Join Channel", url=f"https://t.me/{CHANNEL_USERNAME[1:]}")],
               [InlineKeyboardButton("✅ Joined", callback_data="check_join")]]
@@ -108,76 +111,70 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user = user_ref.child(user_id).get() or {}
         refs = user.get("referrals", 0)
         if refs < REFERRAL_COUNT_NEEDED:
-            bot_me = await context.bot.get_me()
             await query.edit_message_text(f"🔒 {REFERRAL_COUNT_NEEDED} জন রেফার লাগবে। আপনার আছে: {refs}/{REFERRAL_COUNT_NEEDED}\n{progress_bar(refs)}", parse_mode=ParseMode.MARKDOWN)
         else:
             kb = [[InlineKeyboardButton("🚀 Launch Mini App", web_app=WebAppInfo(url=APP_URL))]]
             await query.edit_message_text("✅ রেফার পূর্ণ হয়েছে! নিচের বাটনে ক্লিক করুন:", reply_markup=InlineKeyboardMarkup(kb))
 
+# ব্রডকাস্ট: সবার ইনবক্সে মেসেজ পাঠাবে
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID: return
     if not update.message.reply_to_message:
-        await update.message.reply_text("❌ মেসেজের ওপর রিপ্লাই দিয়ে /broadcast লিখুন।")
+        await update.message.reply_text("❌ যেকোনো মেসেজের ওপর রিপ্লাই দিয়ে /broadcast লিখুন।")
         return
 
     reply_msg = update.message.reply_to_message
-    all_users = user_ref.get()
-    if not all_users: return
-
-    status_msg = await update.message.reply_text(f"⏳ ব্রডকাস্ট শুরু হয়েছে...\nমোট: {len(all_users)}")
-    success, blocked = 0, 0
+    all_users = user_ref.get() or {}
+    status_msg = await update.message.reply_text(f"⏳ ব্রডকাস্ট শুরু... মোট ইউজার: {len(all_users)}")
     
-    for user_id in all_users:
+    success, blocked = 0, 0
+    for uid in all_users:
         try:
-            await context.bot.copy_message(chat_id=user_id, from_chat_id=reply_msg.chat.id, message_id=reply_msg.message_id)
+            await context.bot.copy_message(chat_id=uid, from_chat_id=reply_msg.chat.id, message_id=reply_msg.message_id)
             success += 1
             await asyncio.sleep(0.05)
-        except Exception:
+        except:
             blocked += 1
             
-    await status_msg.edit_text(f"✅ সম্পন্ন!\n🚀 সফল: {success}\n🚫 ব্লক: {blocked}")
+    await status_msg.edit_text(f"✅ সম্পন্ন!\n🚀 সফল: {success}\n🚫 ইনঅ্যাক্টিভ: {blocked}")
 
 async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID: return
-    full_text = " ".join(context.args)
-    data = [i.strip() for i in full_text.split("|")]
+    data = [i.strip() for i in " ".join(context.args).split("|")]
     if len(data) < 3:
         await update.message.reply_text("❌ ফরম্যাট: /post নাম | ইমেজ URL | মুভি লিঙ্ক")
         return
 
     movie_name, image_url, movie_link = data[0], data[1], data[2]
+    # মিনি অ্যাপের জন্য ডেটাবেজে সেভ
     movie_ref.push({"title": movie_name, "image_url": image_url, "video_url": movie_link})
     
+    # চ্যানেলে পোস্ট
     bot_me = await context.bot.get_me()
     kb = [[InlineKeyboardButton("🎬 Watch Movie", url=f"https://t.me/{bot_me.username}")]]
-    
-    await context.bot.send_photo(chat_id=CHANNEL_USERNAME, photo=image_url, caption=f"🎬 **{movie_name}**\n\nমুভিটি দেখতে বাটনে ক্লিক করুন।", reply_markup=InlineKeyboardMarkup(kb), parse_mode=ParseMode.MARKDOWN)
-    await update.message.reply_text("✅ পোস্ট সফল! ব্রডকাস্ট করতে এই মেসেজে রিপ্লাই দিয়ে /broadcast লিখুন।")
+    await context.bot.send_photo(chat_id=CHANNEL_USERNAME, photo=image_url, caption=f"🎬 **{movie_name}**\n\nমুভিটি দেখতে নিচের বাটনে ক্লিক করুন।", reply_markup=InlineKeyboardMarkup(kb), parse_mode=ParseMode.MARKDOWN)
+    await update.message.reply_text("✅ পোস্ট সফল! সবাইকে পাঠাতে রিপ্লাই দিয়ে /broadcast লিখুন।")
 
 async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID: return
-    all_users = user_ref.get()
-    all_movies = movie_ref.get()
-    u_count = len(all_users) if all_users else 0
-    m_count = len(all_movies) if all_movies else 0
-    await update.message.reply_text(f"📊 **বট রিপোর্ট**\n\n👤 ইউজার: {u_count}\n🎬 মুভি: {m_count}")
+    u = len(user_ref.get() or {})
+    m = len(movie_ref.get() or {})
+    await update.message.reply_text(f"📊 **রিপোর্ট**\n👤 মোট ইউজার: {u}\n🎬 মোট মুভি: {m}")
 
 async def post_init(application):
     try:
         await application.bot.set_chat_menu_button(menu_button=MenuButtonWebApp(text="ভিডিও দেখুন", web_app=WebAppInfo(url=MOVIE_APP_URL)))
-        print("Menu Button Set!")
-    except Exception as e:
-        print(f"Menu error: {e}")
+    except:
+        pass
 
-# ---------------- RUN BOT (Python 3.14 Fix) ----------------
+# ---------------- RUN BOT ----------------
 if __name__ == "__main__":
-    # Flask thread start
+    # Flask সার্ভার স্টার্ট
     threading.Thread(target=run_flask, daemon=True).start()
     
-    # Application build
+    # টেলিগ্রাম অ্যাপ্লিকেশন স্টার্ট
     application = ApplicationBuilder().token(BOT_TOKEN).post_init(post_init).build()
     
-    # Handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("status", status))
     application.add_handler(CommandHandler("post", post))
@@ -185,7 +182,6 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("broadcast", broadcast))
     application.add_handler(CallbackQueryHandler(button_handler))
     
-    print("Bot is starting...")
-    
-    # Python 3.14 compatible run method
-    application.run_polling(drop_pending_updates=True, close_loop=False)
+    print("Bot is Live on Python 3.11...")
+    application.run_polling(drop_pending_updates=True)
+
