@@ -35,7 +35,7 @@ MOVIE_APP_URL = "https://mediago99.github.io/Viral-Link01/"
 FIREBASE_DB_URL = "https://viralmoviehubbd-default-rtdb.firebaseio.com/"
 FIREBASE_CREDS = os.environ.get("FIREBASE_CREDENTIALS")
 
-# রেফারেল সংখ্যা (আপনি চাইলে ১ থেকে ৫ করতে পারেন এখানে)
+# রেফারেল সংখ্যা
 REFERRAL_COUNT_NEEDED = 1 
 
 # ---------------- FIREBASE SETUP ----------------
@@ -67,7 +67,7 @@ def progress_bar(count, total=REFERRAL_COUNT_NEEDED):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
-    # ইউজার ডেটাবেজে না থাকলে সেভ করা এবং রেফারেল চেক করা
+    # ইউজার ডাটাবেজে না থাকলে সেভ করা এবং রেফারেল চেক করা
     if not user_ref.child(user_id).get():
         ref_by = context.args[0] if context.args else None
         user_ref.child(user_id).set({"referrals": 0, "coins": 0, "ref_by": ref_by})
@@ -116,7 +116,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             kb = [[InlineKeyboardButton("🚀 Launch Mini App", web_app=WebAppInfo(url=APP_URL))]]
             await query.edit_message_text("✅ রেফার পূর্ণ হয়েছে! নিচের বাটনে ক্লিক করুন:", reply_markup=InlineKeyboardMarkup(kb))
 
-# ব্রডকাস্ট: সবার ইনবক্সে মেসেজ পাঠাবে
+# সংশোধিত ব্রডকাস্ট: ইন-একটিভ ইউজারদের ফায়ারবেজ থেকে ডিলিট করবে
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID: return
     if not update.message.reply_to_message:
@@ -125,18 +125,23 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     reply_msg = update.message.reply_to_message
     all_users = user_ref.get() or {}
-    status_msg = await update.message.reply_text(f"⏳ ব্রডকাস্ট শুরু... মোট ইউজার: {len(all_users)}")
+    total_users = len(all_users)
+    status_msg = await update.message.reply_text(f"⏳ ব্রডকাস্ট শুরু... মোট ইউজার: {total_users}")
     
-    success, blocked = 0, 0
+    success, removed = 0, 0
     for uid in all_users:
         try:
             await context.bot.copy_message(chat_id=uid, from_chat_id=reply_msg.chat.id, message_id=reply_msg.message_id)
             success += 1
-            await asyncio.sleep(0.05)
+            await asyncio.sleep(0.05) # ফ্লাড কন্ট্রোল
         except:
-            blocked += 1
+            # যদি মেসেজ না যায়, ফায়ারবেজ থেকে ডিলিট করা হচ্ছে
+            user_ref.child(str(uid)).delete()
+            removed += 1
             
-    await status_msg.edit_text(f"✅ সম্পন্ন!\n🚀 সফল: {success}\n🚫 ইনঅ্যাক্টিভ: {blocked}")
+    await status_msg.edit_text(
+        f"✅ সম্পন্ন!\n\n🚀 সফল (অ্যাক্টিভ): {success}\n🗑 ডিলিট করা হয়েছে (ইনঅ্যাক্টিভ): {removed}\n📊 বর্তমানে ডাটাবেজে আছে: {total_users - removed}"
+    )
 
 async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID: return
@@ -146,20 +151,19 @@ async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     movie_name, image_url, movie_link = data[0], data[1], data[2]
-    # মিনি অ্যাপের জন্য ডেটাবেজে সেভ
     movie_ref.push({"title": movie_name, "image_url": image_url, "video_url": movie_link})
     
-    # চ্যানেলে পোস্ট
     bot_me = await context.bot.get_me()
     kb = [[InlineKeyboardButton("🎬 Watch Movie", url=f"https://t.me/{bot_me.username}")]]
     await context.bot.send_photo(chat_id=CHANNEL_USERNAME, photo=image_url, caption=f"🎬 **{movie_name}**\n\nমুভিটি দেখতে নিচের বাটনে ক্লিক করুন।", reply_markup=InlineKeyboardMarkup(kb), parse_mode=ParseMode.MARKDOWN)
     await update.message.reply_text("✅ পোস্ট সফল! সবাইকে পাঠাতে রিপ্লাই দিয়ে /broadcast লিখুন।")
 
+# সংশোধিত অ্যাডমিন রিপোর্ট কমান্ড
 async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID: return
     u = len(user_ref.get() or {})
     m = len(movie_ref.get() or {})
-    await update.message.reply_text(f"📊 **রিপোর্ট**\n👤 মোট ইউজার: {u}\n🎬 মোট মুভি: {m}")
+    await update.message.reply_text(f"📊 **রিপোর্ট**\n👤 মোট অ্যাক্টিভ ইউজার: {u}\n🎬 মোট মুভি: {m}")
 
 async def post_init(application):
     try:
@@ -178,10 +182,10 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("status", status))
     application.add_handler(CommandHandler("post", post))
-    application.add_handler(CommandHandler("users", admin_stats))
+    application.add_handler(CommandHandler("users", admin_stats)) # /users কমান্ড ঠিক করা হলো
     application.add_handler(CommandHandler("broadcast", broadcast))
     application.add_handler(CallbackQueryHandler(button_handler))
     
     print("Bot is Live on Python 3.11...")
     application.run_polling(drop_pending_updates=True)
-
+    
