@@ -29,7 +29,17 @@ def run_flask():
 # ---------------- CONFIGURATION ----------------
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 ADMIN_ID = 6311806060  
-CHANNEL_USERNAME = "@viralmoviehubbd"
+
+# যে চ্যানেলে জয়েন করা বাধ্যতামূলক (Force Join)
+REQUIRED_CHANNEL = "@viralmoviehubbd" 
+
+# যে চ্যানেলগুলোতে অটো পোস্ট যাবে (লিস্ট আকারে)
+CHANNELS = [
+    "@viralmoviehubbd", 
+    "@porExpress", 
+    "@ইউজারনেম_এখানে_দিন" # ৩য় চ্যানেলটি এখানে বসাবেন
+]
+
 APP_URL = os.environ.get("APP_URL") 
 MOVIE_APP_URL = "https://mediago99.github.io/Viral-Link01/"
 FIREBASE_DB_URL = "https://viralmoviehubbd-default-rtdb.firebaseio.com/"
@@ -53,7 +63,8 @@ movie_ref = db.reference('movies')
 # ---------------- HELPERS ----------------
 async def is_subscribed(bot, user_id):
     try:
-        member = await bot.get_chat_member(CHANNEL_USERNAME, user_id)
+        # শুধুমাত্র মেইন চ্যানেলের সাবস্ক্রিপশন চেক করবে
+        member = await bot.get_chat_member(REQUIRED_CHANNEL, user_id)
         return member.status in ['member', 'administrator', 'creator']
     except:
         return False
@@ -67,7 +78,6 @@ def progress_bar(count, total=REFERRAL_COUNT_NEEDED):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.effective_user.id)
-    # ইউজার ডাটাবেজে না থাকলে সেভ করা এবং রেফারেল চেক করা
     if not user_ref.child(user_id).get():
         ref_by = context.args[0] if context.args else None
         user_ref.child(user_id).set({"referrals": 0, "coins": 0, "ref_by": ref_by})
@@ -78,9 +88,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "coins": r.get("coins", 0) + 100
             })
     
-    # সাবস্ক্রিপশন চেক
     if not await is_subscribed(context.bot, user_id):
-        kb = [[InlineKeyboardButton("📢 Join Channel", url=f"https://t.me/{CHANNEL_USERNAME[1:]}")],
+        kb = [[InlineKeyboardButton("📢 Join Channel", url=f"https://t.me/{REQUIRED_CHANNEL[1:]}")],
               [InlineKeyboardButton("✅ Joined", callback_data="check_join")]]
         await update.message.reply_text("❌ মুভি দেখতে হলে আগে আমাদের চ্যানেলে জয়েন করুন।", reply_markup=InlineKeyboardMarkup(kb))
     else:
@@ -116,7 +125,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             kb = [[InlineKeyboardButton("🚀 Launch Mini App", web_app=WebAppInfo(url=APP_URL))]]
             await query.edit_message_text("✅ রেফার পূর্ণ হয়েছে! নিচের বাটনে ক্লিক করুন:", reply_markup=InlineKeyboardMarkup(kb))
 
-# সংশোধিত ব্রডকাস্ট: ইন-একটিভ ইউজারদের ফায়ারবেজ থেকে ডিলিট করবে
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID: return
     if not update.message.reply_to_message:
@@ -133,9 +141,8 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             await context.bot.copy_message(chat_id=uid, from_chat_id=reply_msg.chat.id, message_id=reply_msg.message_id)
             success += 1
-            await asyncio.sleep(0.05) # ফ্লাড কন্ট্রোল
+            await asyncio.sleep(0.05) 
         except:
-            # যদি মেসেজ না যায়, ফায়ারবেজ থেকে ডিলিট করা হচ্ছে
             user_ref.child(str(uid)).delete()
             removed += 1
             
@@ -155,10 +162,25 @@ async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     bot_me = await context.bot.get_me()
     kb = [[InlineKeyboardButton("🎬 Watch Movie", url=f"https://t.me/{bot_me.username}")]]
-    await context.bot.send_photo(chat_id=CHANNEL_USERNAME, photo=image_url, caption=f"🎬 **{movie_name}**\n\nমুভিটি দেখতে নিচের বাটনে ক্লিক করুন।", reply_markup=InlineKeyboardMarkup(kb), parse_mode=ParseMode.MARKDOWN)
-    await update.message.reply_text("✅ পোস্ট সফল! সবাইকে পাঠাতে রিপ্লাই দিয়ে /broadcast লিখুন।")
+    
+    success_count = 0
+    for channel in CHANNELS:
+        if "@ইউজারনেম_" in channel: continue # ইউজারনেম পরিবর্তন না করলে সেটি স্কিপ করবে
+        try:
+            await context.bot.send_photo(
+                chat_id=channel, 
+                photo=image_url, 
+                caption=f"🎬 **{movie_name}**\n\nমুভিটি দেখতে নিচের বাটনে ক্লিক করুন।", 
+                reply_markup=InlineKeyboardMarkup(kb), 
+                parse_mode=ParseMode.MARKDOWN
+            )
+            success_count += 1
+            await asyncio.sleep(0.1)
+        except Exception as e:
+            print(f"Error sending to {channel}: {e}")
 
-# সংশোধিত অ্যাডমিন রিপোর্ট কমান্ড
+    await update.message.reply_text(f"✅ পোস্ট সফল! মোট {success_count}টি চ্যানেলে পাঠানো হয়েছে।")
+
 async def admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID: return
     u = len(user_ref.get() or {})
@@ -173,19 +195,17 @@ async def post_init(application):
 
 # ---------------- RUN BOT ----------------
 if __name__ == "__main__":
-    # Flask সার্ভার স্টার্ট
     threading.Thread(target=run_flask, daemon=True).start()
     
-    # টেলিগ্রাম অ্যাপ্লিকেশন স্টার্ট
     application = ApplicationBuilder().token(BOT_TOKEN).post_init(post_init).build()
     
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("status", status))
     application.add_handler(CommandHandler("post", post))
-    application.add_handler(CommandHandler("users", admin_stats)) # /users কমান্ড ঠিক করা হলো
+    application.add_handler(CommandHandler("users", admin_stats))
     application.add_handler(CommandHandler("broadcast", broadcast))
     application.add_handler(CallbackQueryHandler(button_handler))
     
     print("Bot is Live on Python 3.11...")
     application.run_polling(drop_pending_updates=True)
-    
+                        
