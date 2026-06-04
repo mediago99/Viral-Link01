@@ -36,7 +36,7 @@ REQUIRED_CHANNEL = "@viralmoviehubbd"
 # যে চ্যানেলগুলোতে অটো পোস্ট যাবে (লিস্ট আকারে)
 CHANNELS = [
     "@viralmoviehubbd", 
-    "@porExpress", 
+    "@pornExpress1", 
     "@ইউজারনেম_এখানে_দিন" # ৩য় চ্যানেলটি এখানে বসাবেন
 ]
 
