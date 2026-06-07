@@ -125,21 +125,54 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             kb = [[InlineKeyboardButton("🚀 Launch Mini App", web_app=WebAppInfo(url=APP_URL))]]
             await query.edit_message_text("✅ রেফার পূর্ণ হয়েছে! নিচের বাটনে ক্লিক করুন:", reply_markup=InlineKeyboardMarkup(kb))
 
+# 📢 ফিক্সড ব্রডকাস্ট সিস্টেম: রিপ্লাই করা পোস্ট থেকে ডেটা নিয়ে চ্যানেল স্টাইলে পাঠাবে
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID: return
     if not update.message.reply_to_message:
-        await update.message.reply_text("❌ যেকোনো মেসেজের ওপর রিপ্লাই দিয়ে /broadcast লিখুন।")
+        await update.message.reply_text("❌ যেকোনো পোস্ট মেসেজের ওপর রিপ্লাই দিয়ে /broadcast লিখুন।")
         return
 
     reply_msg = update.message.reply_to_message
+    msg_text = reply_msg.text or reply_msg.caption or ""
+
+    # /post কমান্ড থেকে মুভির নাম, ইমেজ এবং লিংক আলাদা করার লজিক
+    if not msg_text.startswith("/post"):
+        await update.message.reply_text("❌ ভুল মেসেজে রিপ্লাই করেছেন! শুধুমাত্র আপনার করা '/post ...' মেসেজের ওপর রিপ্লাই দিন।")
+        return
+
+    try:
+        # /post অংশটুকু বাদ দিয়ে বাকি টেক্সট পাইপ (|) দিয়ে আলাদা করা
+        clean_text = msg_text.replace("/post", "").strip()
+        data = [i.strip() for i in clean_text.split("|")]
+        
+        if len(data) < 3:
+            await update.message.reply_text("❌ রিপ্লাই করা পোস্টে ডেটা কম আছে (ফরম্যাট ঠিক নেই) ।")
+            return
+            
+        movie_name, image_url, movie_link = data[0], data[1], data[2]
+    except Exception as e:
+        await update.message.reply_text(f"❌ ডেটা প্রসেস করতে সমস্যা হয়েছে: {e}")
+        return
+
     all_users = user_ref.get() or {}
     total_users = len(all_users)
-    status_msg = await update.message.reply_text(f"⏳ ব্রডকাস্ট শুরু... মোট ইউজার: {total_users}")
+    status_msg = await update.message.reply_text(f"⏳ চ্যানেল স্টাইলে ইনবক্স ব্রডকাস্ট শুরু... মোট ইউজার: {total_users}")
+    
+    bot_me = await context.bot.get_me()
+    # নিচের বাটনটি চ্যানেলের মতো তৈরি করা হলো
+    kb = [[InlineKeyboardButton("🎬 Watch Movie", url=f"https://t.me/{bot_me.username}")]]
     
     success, removed = 0, 0
     for uid in all_users:
         try:
-            await context.bot.copy_message(chat_id=uid, from_chat_id=reply_msg.chat.id, message_id=reply_msg.message_id)
+            # সরাসরি ইমেজ এবং ক্যাপশন মেথড ব্যবহার করে পাঠানো হচ্ছে (কমান্ড টেক্সট যাবে না)
+            await context.bot.send_photo(
+                chat_id=uid,
+                photo=image_url,
+                caption=f"🎬 **{movie_name}**\n\nমুভিটি দেখতে নিচের বাটনটিতে ক্লিক করুন।",
+                reply_markup=InlineKeyboardMarkup(kb),
+                parse_mode=ParseMode.MARKDOWN
+            )
             success += 1
             await asyncio.sleep(0.05) 
         except:
@@ -147,7 +180,10 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
             removed += 1
             
     await status_msg.edit_text(
-        f"✅ সম্পন্ন!\n\n🚀 সফল (অ্যাক্টিভ): {success}\n🗑 ডিলিট করা হয়েছে (ইনঅ্যাক্টিভ): {removed}\n📊 বর্তমানে ডাটাবেজে আছে: {total_users - removed}"
+        f"✅ **চ্যানেল স্টাইলে ব্রডকাস্ট সম্পন্ন!**\n\n"
+        f"🚀 সফল (ইনবক্সে ব্যানার সহ গেছে): {success}\n"
+        f"🗑 ডিলিট করা হয়েছে (ইনঅ্যাক্টিভ): {removed}\n"
+        f"📊 বর্তমানে ডাটাবেজে সচল আছে: {total_users - removed}"
     )
 
 async def post(update: Update, context: ContextTypes.DEFAULT_TYPE):
