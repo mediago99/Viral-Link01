@@ -162,7 +162,7 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # নিচের বাটনটি চ্যানেলের মতো তৈরি করা হলো
     kb = [[InlineKeyboardButton(
     "🎬 Watch Movie",
-    web_app=WebAppInfo(url=MOVIE_APP_URL)
+    url=f"https://t.me/{bot_me.username}/app"
 )]]
     success, removed = 0, 0
     for uid in all_users:
