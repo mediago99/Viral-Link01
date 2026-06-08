@@ -160,8 +160,7 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     bot_me = await context.bot.get_me()
     # নিচের বাটনটি চ্যানেলের মতো তৈরি করা হলো
-    kb = [[InlineKeyboardButton("🎬 Watch Movie",web_app=WebAppInfo(url=MOVIE_APP_URL))]]
-    
+    kb = [[InlineKeyboardButton("🎬 Watch Movie", web_app=WebAppInfo(url=MOVIE_APP_URL))]]
     success, removed = 0, 0
     for uid in all_users:
         try:
